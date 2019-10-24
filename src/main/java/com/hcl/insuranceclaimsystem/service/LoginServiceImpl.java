@@ -13,7 +13,8 @@ import com.hcl.insuranceclaimsystem.util.InsuranceClaimSystemConstants;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * This class contains the method for login.
+ * Implementation of LoginService for login to the application.
+ * 
  * @author Sreeshma S Menon
  * @since 2109/10/21
  *
@@ -29,15 +30,16 @@ public class LoginServiceImpl implements LoginService {
 	/**
 	 * This method will accept loginRequest as input and get user object for given
 	 * user name and password.Then return optional of user.
-	 * @param loginRequest
-	 * @return optional of User
+	 * 
+	 * @param loginRequest which contains login credentials.
+	 * @return optional of User who logged in.
 	 */
 	@Override
 	public Optional<User> getUser(LoginRequest loginRequest) {
-		log.debug(InsuranceClaimSystemConstants.LOGIN_DEBUG_START_SERVICE);
+		log.info(InsuranceClaimSystemConstants.LOGIN_INFO_START_SERVICE);
 		Optional<User> optionalUser = userRepository.findByEmailAndPassword(loginRequest.getEmail(),
 				loginRequest.getPassword());
-		log.debug(InsuranceClaimSystemConstants.LOGIN_DEBUG_END_SERVICE);
+		log.info(InsuranceClaimSystemConstants.LOGIN_INFO_END_SERVICE);
 		return optionalUser;
 	}
 }

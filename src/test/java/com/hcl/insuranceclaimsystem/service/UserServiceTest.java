@@ -3,6 +3,7 @@ import static org.junit.Assert.assertNotNull;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.Before;
@@ -12,9 +13,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
+
 import com.hcl.insuranceclaimsystem.dto.ClaimApproveRequest;
+import com.hcl.insuranceclaimsystem.dto.ClaimDetailsResponse;
 import com.hcl.insuranceclaimsystem.entity.Claim;
 import com.hcl.insuranceclaimsystem.entity.ClaimDetail;
+import com.hcl.insuranceclaimsystem.exception.ClaimsNotFoundException;
 import com.hcl.insuranceclaimsystem.exception.UserNotFoundException;
 import com.hcl.insuranceclaimsystem.repository.ClaimDetailRepository;
 import com.hcl.insuranceclaimsystem.repository.ClaimRepository;
@@ -57,7 +61,7 @@ public class UserServiceTest {
 	}
 	
 	@Test
-	public void testApproveClaim() throws UserNotFoundException {
+	public void testApproveClaim() throws UserNotFoundException, ClaimsNotFoundException {
 		Mockito.when(userRepository.getUserRole(Mockito.anyInt())).thenReturn(Optional.of("FIRST_LEVEL_APPROVER"));
 		Mockito.when(claimRepository.findById(Mockito.anyInt())).thenReturn(Optional.of(claim));
 		Mockito.when(claimRepository.updateStatus("FIRST_LEVEL_APPROVED", 1)).thenReturn(1);
@@ -65,14 +69,22 @@ public class UserServiceTest {
 		Optional<ClaimDetail>claimDetailOptional=userServiceImpl.approveClaim(1, claimApproveRequest);
 		assertNotNull(claimDetailOptional);
 	}
+	@Test(expected = ClaimsNotFoundException.class)
+	public void testClaimNotFound() throws UserNotFoundException, ClaimsNotFoundException {
+		Mockito.when(userRepository.getUserRole(Mockito.anyInt())).thenReturn(Optional.of("FIRST_LEVEL_APPROVER"));
+		Mockito.when(claimRepository.findById(Mockito.anyInt())).thenReturn(Optional.empty());
+		Optional<ClaimDetail>claimDetailOptional=userServiceImpl.approveClaim(1, claimApproveRequest);
+		assertNotNull(claimDetailOptional);
+	}
+	
 	@Test(expected = UserNotFoundException.class)
-	public void testUserNotFound() throws UserNotFoundException {
+	public void testUserNotFound() throws UserNotFoundException, ClaimsNotFoundException {
 		Mockito.when(userRepository.getUserRole(Mockito.anyInt())).thenReturn(Optional.empty());
 		Optional<ClaimDetail>claimDetailOptional=userServiceImpl.approveClaim(1, claimApproveRequest);
 		assertNotNull(claimDetailOptional);
 	}
 	@Test
-	public void testFirstLevelReject() throws UserNotFoundException {
+	public void testFirstLevelReject() throws UserNotFoundException, ClaimsNotFoundException {
 		claimApproveRequest.setClaimStatus("REJECT");
 		Mockito.when(userRepository.getUserRole(Mockito.anyInt())).thenReturn(Optional.of("FIRST_LEVEL_APPROVER"));
 		Mockito.when(claimRepository.findById(Mockito.anyInt())).thenReturn(Optional.of(claim));
@@ -82,7 +94,7 @@ public class UserServiceTest {
 		assertNotNull(claimDetailOptional);
 	}
 	@Test
-	public void testSecondLevelApprove() throws UserNotFoundException {
+	public void testSecondLevelApprove() throws UserNotFoundException, ClaimsNotFoundException {
 		claimApproveRequest.setClaimStatus("APPROVE");
 		Mockito.when(userRepository.getUserRole(Mockito.anyInt())).thenReturn(Optional.of("SECOND_LEVEL_APPROVER"));
 		Mockito.when(claimRepository.findById(Mockito.anyInt())).thenReturn(Optional.of(claim));
@@ -92,7 +104,7 @@ public class UserServiceTest {
 		assertNotNull(claimDetailOptional);
 	}
 	@Test
-	public void testSecondLevelReject() throws UserNotFoundException {
+	public void testSecondLevelReject() throws UserNotFoundException, ClaimsNotFoundException {
 		claimApproveRequest.setClaimStatus("REJECT");
 		Mockito.when(userRepository.getUserRole(Mockito.anyInt())).thenReturn(Optional.of("SECOND_LEVEL_APPROVER"));
 		Mockito.when(claimRepository.findById(Mockito.anyInt())).thenReturn(Optional.of(claim));
@@ -103,7 +115,7 @@ public class UserServiceTest {
 	}
 	
 	@Test
-	public void testEligibleAmount() throws UserNotFoundException {
+	public void testEligibleAmount() throws UserNotFoundException, ClaimsNotFoundException {
 		claimApproveRequest.setClaimStatus("APPROVE");
 		Mockito.when(userRepository.getUserRole(Mockito.anyInt())).thenReturn(Optional.of("FIRST_LEVEL_APPROVER"));
 		Mockito.when(claimRepository.findById(Mockito.anyInt())).thenReturn(Optional.of(claim));
@@ -113,5 +125,27 @@ public class UserServiceTest {
 		Optional<ClaimDetail>claimDetailOptional=userServiceImpl.approveClaim(1, claimApproveRequest);
 		assertNotNull(claimDetailOptional);
 	}
+
+	@Test
+	public void testGetClaims() throws UserNotFoundException {
+		Mockito.when(userRepository.getUserRole(1)).thenReturn(Optional.of("FIRST_LEVEL_APPROVER"));
+		Optional<List<ClaimDetailsResponse>> claimResponses = userServiceImpl.getClaims(1);
+		assertNotNull(claimResponses);
+	}
+
 	
+	@Test
+	public void testGetClaimsSecondLevelApprover() throws UserNotFoundException {
+		Mockito.when(userRepository.getUserRole(2)).thenReturn(Optional.of("SECOND_LEVEL_APPROVER"));
+		Optional<List<ClaimDetailsResponse>> claimResponses = userServiceImpl.getClaims(2);
+		assertNotNull(claimResponses);
+	}
+	
+	@Test(expected = UserNotFoundException.class)
+	public void testExpectedUserNotFoundException() throws UserNotFoundException {
+		Mockito.when(userRepository.getUserRole(1)).thenReturn(Optional.empty());
+		Optional<List<ClaimDetailsResponse>> claimResponses = userServiceImpl.getClaims(1);
+		assertNotNull(claimResponses);
+	}
+
 }

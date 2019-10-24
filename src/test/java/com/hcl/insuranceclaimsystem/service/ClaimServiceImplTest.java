@@ -21,16 +21,16 @@ import org.springframework.http.HttpStatus;
 import com.hcl.insuranceclaimsystem.dto.ClaimDetailsResponse;
 import com.hcl.insuranceclaimsystem.dto.ClaimEntryInput;
 import com.hcl.insuranceclaimsystem.dto.ClaimEntryOutput;
-import com.hcl.insuranceclaimsystem.dto.HospitalDetails;
 import com.hcl.insuranceclaimsystem.entity.Ailment;
 import com.hcl.insuranceclaimsystem.entity.Claim;
 import com.hcl.insuranceclaimsystem.entity.ClaimDetail;
-import com.hcl.insuranceclaimsystem.entity.HospitalDetail;
+import com.hcl.insuranceclaimsystem.entity.Hospital;
 import com.hcl.insuranceclaimsystem.entity.Insurance;
 import com.hcl.insuranceclaimsystem.entity.Role;
 import com.hcl.insuranceclaimsystem.entity.User;
-import com.hcl.insuranceclaimsystem.exception.CommonException;
-import com.hcl.insuranceclaimsystem.exception.UserNotFoundException;
+import com.hcl.insuranceclaimsystem.exception.AilmentNotFoundException;
+import com.hcl.insuranceclaimsystem.exception.ClaimException;
+import com.hcl.insuranceclaimsystem.exception.ClaimsNotFoundException;
 import com.hcl.insuranceclaimsystem.repository.AilmentRepository;
 import com.hcl.insuranceclaimsystem.repository.ClaimDetailRepository;
 import com.hcl.insuranceclaimsystem.repository.ClaimRepository;
@@ -56,26 +56,22 @@ public class ClaimServiceImplTest {
 	AilmentRepository ailmentRepository;
 	Insurance insurance;
 	ClaimEntryInput claimEntryInput;
-	Integer userId;
 	List<ClaimDetailsResponse> claimResponses;
 	ClaimDetailsResponse claimResponse;
 	User user;
 	Role role;
 	Claim claim;
 	List<Claim> claims;
-	String userRole;
 	Integer claimId;
 	ClaimDetail claimDetail;
 	String status;
 	List<String> statusList;
-	List<HospitalDetail> details;
-	HospitalDetail hospitalDetail;
-
+	List<Hospital> details;
+	Hospital hospitalDetail;
 	Ailment ailment;
 
 	@Before
 	public void setup() {
-		userId = 1;
 		claimResponse = new ClaimDetailsResponse();
 		claimResponse.setClaimId(1);
 		claimResponses = new ArrayList<>();
@@ -86,7 +82,6 @@ public class ClaimServiceImplTest {
 		role = new Role();
 		role.setRoleName("FIRST_LEVEL_APPROVER");
 		role.setRoleId(1);
-		userRole = "FIRST_LEVEL_APPROVER";
 		insurance = new Insurance();
 		insurance.setAddress("address");
 		insurance.setCustomerName("Name");
@@ -110,7 +105,7 @@ public class ClaimServiceImplTest {
 		claims.add(claim);
 		claimId = 1;
 		statusList = new ArrayList<>();
-		hospitalDetail = new HospitalDetail();
+		hospitalDetail = new Hospital();
 		hospitalDetail.setHospitalId(1);
 		details = new ArrayList<>();
 		details.add(hospitalDetail);
@@ -128,62 +123,39 @@ public class ClaimServiceImplTest {
 		claimEntryInput.setDiagnosis(claim.getDiagnosis());
 		claimEntryInput.setTotalClaimAmount(claim.getTotalClaimAmount());
 		claimEntryInput.setDischargeDate(claim.getDischargeDate());
-		claimEntryInput.setInsuranceNumber(claim.getInsuranceNumber());
+		claimEntryInput.setInsuranceNumber(claim.getInsuranceNumber());		
 
 	}
+
+
+
 
 	@Test
-	public void testGetClaims() throws UserNotFoundException {
-		Mockito.when(userRepository.getUserRole(userId)).thenReturn(Optional.of(userRole));
-		Optional<List<ClaimDetailsResponse>> claimResponses = claimServiceImpl.getClaims(userId);
-		assertNotNull(claimResponses);
-	}
-
-	
-	@Test
-	public void testGetClaimsSecondLevelApprover() throws UserNotFoundException {
-		userId = 2;
-		user.setUserId(userId);
-		user.setRoleId(2);
-		userRole = "SECOND_LEVEL_APPROVER";
-		claim.setClaimStatus("SECOND_LEVEL_APPROVED");
-		claims.add(claim);
-		Mockito.when(userRepository.getUserRole(userId)).thenReturn(Optional.of(userRole));
-		Optional<List<ClaimDetailsResponse>> claimResponses = claimServiceImpl.getClaims(userId);
-		assertNotNull(claimResponses);
-	}
-
-	@Test(expected = UserNotFoundException.class)
-	public void testExpectedUserNotFoundException() throws UserNotFoundException {
-		Mockito.when(userRepository.getUserRole(userId)).thenReturn(Optional.empty());
-		Optional<List<ClaimDetailsResponse>> claimResponses = claimServiceImpl.getClaims(userId);
-		Assert.assertEquals(claims.get(0).getClaimId(), claimResponses.get().get(0).getClaimId());
-	}
-
-	@Test
-	public void testGetAllHospitalDetails() {
-		Mockito.when(hospitalDetailRepository.findAll()).thenReturn(details);
-		Optional<List<HospitalDetails>> hospitalDetailsList = claimServiceImpl.getAllHospitalDetails();
-		Assert.assertNotNull(hospitalDetailsList);
-	}
-
-	@Test
-	public void testTrackClaim() {
+	public void testTrackClaim() throws ClaimsNotFoundException {
 		claim.setClaimStatus("PENDING");
 		Mockito.when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
 		String actualStatus = claimServiceImpl.trackClaim(claimId);
 		Assert.assertEquals("PENDING", actualStatus);
 	}
 
-	@Test(expected = CommonException.class)
-	public void testClaimEntry() throws CommonException {
+	@Test
+	public void testClaimEntry() throws ClaimException, AilmentNotFoundException {
 		Mockito.when(insuranceRepository.findById(Mockito.anyInt())).thenReturn(Optional.of(insurance));
+		Mockito.when(ailmentRepository.findByNatureOfAilment(Mockito.anyString())).thenReturn(Optional.of(ailment));
+		ClaimEntryOutput claimEntryOutput=claimServiceImpl.claimEntry(claimEntryInput);
+		assertNotNull(claimEntryOutput);
+
+	}
+	
+	@Test(expected = ClaimException.class)
+	public void testInvalidInsurance() throws ClaimException, AilmentNotFoundException {
+		Mockito.when(insuranceRepository.findById(Mockito.anyInt())).thenReturn(Optional.empty());
 		claimServiceImpl.claimEntry(claimEntryInput);
 
 	}
 
-	@Test(expected = CommonException.class)
-	public void testClaimEntryNatureEliment() throws CommonException {
+	@Test(expected = AilmentNotFoundException.class)
+	public void testClaimEntryNatureAilment() throws ClaimException, AilmentNotFoundException {
 		claimEntryInput.setInsuranceNumber(claim.getInsuranceNumber());
 		Mockito.when(insuranceRepository.findById(claim.getInsuranceNumber())).thenReturn(Optional.of(insurance));
 		ClaimEntryOutput actual = claimServiceImpl.claimEntry(claimEntryInput);
@@ -191,8 +163,8 @@ public class ClaimServiceImplTest {
 
 	}
 
-	@Test(expected = CommonException.class)
-	public void testClaimEntryDischargeDate() throws CommonException {
+	@Test(expected = ClaimException.class)
+	public void testClaimEntryDischargeDate() throws ClaimException, AilmentNotFoundException  {
 		claimEntryInput.setInsuranceNumber(claim.getInsuranceNumber());
 		claimEntryInput.setDischargeDate(LocalDate.now().minusDays(2));
 		Mockito.when(insuranceRepository.findById(claim.getInsuranceNumber())).thenReturn(Optional.of(insurance));
@@ -201,19 +173,18 @@ public class ClaimServiceImplTest {
 
 	}
 
-	@Test(expected = CommonException.class)
-	public void testClaimEntryNagetiveAmount() throws CommonException {
+	@Test(expected = ClaimException.class)
+	public void testClaimEntryNagetiveAmount() throws ClaimException, AilmentNotFoundException  {
 		claimEntryInput.setInsuranceNumber(claim.getInsuranceNumber());
 		claimEntryInput.setTotalClaimAmount(-100d);
 		Mockito.when(insuranceRepository.findById(claim.getInsuranceNumber())).thenReturn(Optional.of(insurance));
-
 		ClaimEntryOutput actual = claimServiceImpl.claimEntry(claimEntryInput);
 		Assert.assertEquals(HttpStatus.OK.value(), actual.getStatusCode().intValue());
 
 	}
 
 	@Test
-	public void testClaimEntryPositive() throws CommonException {
+	public void testClaimEntryPositive() throws ClaimException, AilmentNotFoundException  {
 		claimEntryInput.setInsuranceNumber(claim.getInsuranceNumber());
 		Mockito.when(insuranceRepository.findById(claim.getInsuranceNumber())).thenReturn(Optional.of(insurance));
 		Mockito.when(ailmentRepository.findByNatureOfAilment(claimEntryInput.getAilmentNature()))
@@ -223,7 +194,7 @@ public class ClaimServiceImplTest {
 
 	}
 	@Test
-	public void testHospitalExist() throws CommonException {
+	public void testHospitalExist() throws ClaimException, AilmentNotFoundException  {
 		claimEntryInput.setInsuranceNumber(claim.getInsuranceNumber());
 		Mockito.when(insuranceRepository.findById(claim.getInsuranceNumber())).thenReturn(Optional.of(insurance));
 		Mockito.when(ailmentRepository.findByNatureOfAilment(claimEntryInput.getAilmentNature()))
@@ -234,7 +205,7 @@ public class ClaimServiceImplTest {
 
 	}
 	@Test
-	public void testHospitalOther() throws CommonException {
+	public void testHospitalOther() throws ClaimException, AilmentNotFoundException{
 		claimEntryInput.setInsuranceNumber(claim.getInsuranceNumber());
 		Mockito.when(insuranceRepository.findById(claim.getInsuranceNumber())).thenReturn(Optional.of(insurance));
 		Mockito.when(ailmentRepository.findByNatureOfAilment(claimEntryInput.getAilmentNature()))
